@@ -22,6 +22,9 @@ class OnnxModel(object):
             model = onnx.load(model)
         self.model = model
 
+    def add_node(self, node):
+        self.model.graph.node.extend([node])
+        
     def get_input2nodes(self):
         # mapping input_name->nodes
         input2nodes = {}
@@ -48,6 +51,33 @@ class OnnxModel(object):
             name2init[i.name] = i
         return name2init
 
+    def get_initializer(self, name):
+        for tensor in self.model.graph.initializer:
+            if tensor.name == name:
+                return tensor
+        return None
+
+    @staticmethod
+    def replace_node_input(node, old_input_name, new_input_name):
+        assert isinstance(old_input_name, str) and isinstance(new_input_name, str)
+        for j in range(len(node.input)):
+            if node.input[j] == old_input_name:
+                node.input[j] = new_input_name
+
+    def replace_input_of_all_nodes(self, old_input_name, new_input_name):
+        for node in self.model.graph.node:
+            OnnxModel.replace_node_input(node, old_input_name, new_input_name)
+
+    @staticmethod
+    def replace_node_output(node, old_output_name, new_output_name):
+        assert isinstance(old_output_name, str) and isinstance(new_output_name, str)
+        for j in range(len(node.output)):
+            if node.output[j] == old_output_name:
+                node.output[j] = new_output_name
+
+    def replace_output_of_all_nodes(self, old_output_name, new_output_name):
+        for node in self.model.graph.node:
+            OnnxModel.replace_node_output(node, old_output_name, new_output_name)
 
     def sort(self):
         """
@@ -314,7 +344,50 @@ class OnnxModel(object):
 
             assert j < len(node2.input)-1, "no connection between these two nodes!" 
 
- 
+    def convert_model_float32_to_float16(self):
+        graph = self.model.graph
+        initializers = graph.initializer
+
+        for initializer in initializers:
+            if initializer.data_type == 1:
+                initializer.CopyFrom(
+                    numpy_helper.from_array(numpy_helper.to_array(initializer).astype(np.float16), initializer.name))
+
+        for node in graph.node:
+            if node.op_type in ['Constant', 'ConstantOfShape']:
+                for att in node.attribute:
+                    if att.name == 'value' and att.t.data_type == 1:
+                        att.CopyFrom(
+                            helper.make_attribute(
+                                "value", numpy_helper.from_array(numpy_helper.to_array(att.t).astype(np.float16))))
+            if node.op_type == 'Cast':
+                for att in node.attribute:
+                    if att.name == 'to' and att.i == 1:
+                        att.CopyFrom(helper.make_attribute("to", 10))
+
+        for input_value_info in graph.input:
+            if input_value_info.type.tensor_type.elem_type == onnx.TensorProto.FLOAT:
+                initializer = self.get_initializer(input_value_info.name)
+                if initializer is not None:  # for compatibility for old converter/exporter
+                    input_value_info.type.tensor_type.elem_type = 10
+                else:
+                    cast_input = input_value_info.name
+                    cast_output = input_value_info.name + '_float16'
+                    self.replace_input_of_all_nodes(cast_input, cast_output)
+                    cast_node = helper.make_node('Cast', inputs=[cast_input], outputs=[cast_output])
+                    cast_node.attribute.extend([helper.make_attribute("to", int(onnx.TensorProto.FLOAT16))])
+                    self.add_node(cast_node)
+
+        for output_value_info in graph.output:
+            if output_value_info.type.tensor_type.elem_type == onnx.TensorProto.FLOAT:
+                cast_input = output_value_info.name + '_float16'
+                cast_output = output_value_info.name
+                self.replace_output_of_all_nodes(cast_output, cast_input)
+                self.replace_input_of_all_nodes(cast_output, cast_input)
+                cast_node = helper.make_node('Cast', inputs=[cast_input], outputs=[cast_output])
+                cast_node.attribute.extend([helper.make_attribute("to", int(onnx.TensorProto.FLOAT))])
+                self.add_node(cast_node)
+
 
     def preprocess(self):
         self.remove_initializer_from_input()

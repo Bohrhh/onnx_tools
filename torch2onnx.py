@@ -58,30 +58,21 @@ def torch_model_onnx(
     )
 
 
-class Haha(nn.Module):
-    def __init__(self):
-        super(Haha, self).__init__()
-        # self.upsample = nn.Upsample(size=(32,32))
-
-    def forward(self, x):
-        x = x[0,0,0,0]
-        return x
-
 def haha():
-    model = Haha()
+    model = models.mobilenet_v2(pretrained=True)
     model.eval()
     x = torch.rand(1,3,224,224)
 
     torch_model_onnx(
         model, 
         [x],
-        './haha.onnx',
+        './mobilenet_v2.onnx',
         input_names = ['x'],
         output_names = ['y'],
         dynamic_axes = None
     )
 
-    print('export haha.onnx sucessfully!')
+    print('export mobilenet_v2.onnx sucessfully!')
         
 
 
