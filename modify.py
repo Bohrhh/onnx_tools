@@ -6,6 +6,46 @@ from onnx import AttributeProto, TensorProto, GraphProto
 from onnx import numpy_helper
 import numpy as np
 
+def superpoint_lite():
+    model =  onnx.load("haha.onnx")
+
+    grid_sample = helper.make_node(
+        'GridSample', # node name
+        ['feat', 'norm_keypoints'], # inputs
+        ['des_sample'], # outputs
+        mode = 1,
+        padding_mode = 0,
+        align_corners = True
+    )
+
+    # ====== remove input ======
+    to_be_removed = []
+    for i in model.graph.input:
+        if i.name in ["des_sample"]:
+            to_be_removed.append(i)
+    for i in to_be_removed:
+        model.graph.input.remove(i)
+
+    # ====== remove output ======
+    to_be_removed = []
+    for i in model.graph.output:
+        if i.name in ["feat", "norm_keypoints"]:
+            to_be_removed.append(i)
+    for i in to_be_removed:
+        model.graph.output.remove(i)
+
+    # for i in model.graph.initializer:
+    #     if i.name == "278":
+    #         model.graph.initializer.remove(i)
+    #         a = numpy_helper.from_array(np.array(0.025).astype('float32'))
+    #         a.name = "278"
+    #         model.graph.initializer.append(a)
+    #         break
+
+
+    model.graph.node.extend([grid_sample])
+    onnx.save(model, 'superpoint_lite.onnx')
+
 
 def pydnet():
     model = onnx.load("models/pydnet.onnx")

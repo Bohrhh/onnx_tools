@@ -91,14 +91,14 @@ class Dataset(object):
         if idx>=self.__len__():
             raise IndexError
         x = os.path.join(self.root, self.datas[idx])
-        x = cv2.imread(x)
-        x = cv2.resize(x, (224, 224))/255.
-        x = x.transpose(2,0,1)[None].astype('float32').copy()
+        x = cv2.imread(x, cv2.IMREAD_GRAYSCALE)
+        x = (cv2.resize(x, (512, 320))/255.-0.449)/0.226
+        x = x[None, None].astype('float32').copy()
         return x
 
     def __len__(self):
         # return len(self.datas)
-        return 50
+        return 100
 
 
 def main(model, network_tensors):
@@ -112,7 +112,7 @@ def main(model, network_tensors):
     # prepare model
     #-----------------------------------------------
     base = OnnxModel(model)
-    dataloader = Dataset('/mnt/4ACC22D0CC22B65B/DATA/mscoco/val2014')
+    dataloader = Dataset('/home/kmlee/DATA/mscoco_2014/val2014')
 
     #-----------------------------------------------
     # working procedur

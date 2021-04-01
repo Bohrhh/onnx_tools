@@ -57,22 +57,6 @@ def torch_model_onnx(
             # keep_initializers_as_inputs=True
     )
 
-
-def haha():
-    model = models.mobilenet_v2(pretrained=True)
-    model.eval()
-    x = torch.rand(1,3,224,224)
-
-    torch_model_onnx(
-        model, 
-        [x],
-        './mobilenet_v2.onnx',
-        input_names = ['x'],
-        output_names = ['y'],
-        dynamic_axes = None
-    )
-
-    print('export mobilenet_v2.onnx sucessfully!')
         
 
 

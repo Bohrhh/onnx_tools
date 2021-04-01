@@ -265,14 +265,23 @@ class OnnxModel(object):
 
     def clipAdjusted(self):
         # modify Clip node
-        # !!! ===================== not complited ===================== !!!
         for i,n in enumerate(self.model.graph.node):
             if n.op_type == "Clip":
                 attr_len = len(n.attribute)
                 attr = [n.attribute.pop() for i in range(attr_len)]
                 attr = {a.name:a for a in attr}
+                npdtype = ONNXTYPE2NUMPY[1]
                 if len(attr)==0:
-                    continue
+                    if n.input[1] == '':
+                        mintensor = numpy_helper.from_array(np.array(-INF).astype(npdtype))
+                        mintensor.name = 'clipmin'+str(i)
+                        n.input[1] = 'clipmin'+str(i)
+                        self.model.graph.initializer.append(mintensor)
+                    if n.input[2] == '':
+                        maxtensor = numpy_helper.from_array(np.array(INF).astype(npdtype))
+                        maxtensor.name = 'clipmax'+str(i)
+                        n.input[2] = 'clipmax'+str(i)
+                        self.model.graph.initializer.append(maxtensor)
                 else:
                     n.input.extend(['clipmin'+str(i), 'clipmax'+str(i)])
                     dtype = 1
